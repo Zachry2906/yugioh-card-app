@@ -59,7 +59,7 @@ git clone https://github.com/yourusername/tugasakhirpraktikum.git
 
 2. Navigate to the project directory:
 ```
-cd tugasakhirpraktikum
+cd yugioh-card-app
 ```
 
 3. Install dependencies:
@@ -85,8 +85,6 @@ flutter run
 - Push notifications for price alerts
 - Community features and social sharing
 
-## License
-*(Add your license information here)*
 
 ## Credits
 Developed by *Me n V0* as a final practical project.
