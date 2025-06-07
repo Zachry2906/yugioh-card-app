@@ -1,83 +1,91 @@
 import 'package:flutter/material.dart';
 import '../models/yugioh_card.dart';
 import '../services/database_helper.dart';
+import '../services/notification_service.dart';
 
-class FavoritesProvider with ChangeNotifier {
+class FavoritesProvider extends ChangeNotifier {
   List<YugiohCard> _favorites = [];
   bool _isLoading = false;
-  List<YugiohCard> _memoryFavorites = []; // Fallback untuk jika database tidak tersedia
+  String _error = '';
 
   List<YugiohCard> get favorites => _favorites;
   bool get isLoading => _isLoading;
+  String get error => _error;
 
   Future<void> loadFavorites() async {
     _isLoading = true;
+    _error = '';
     notifyListeners();
 
     try {
-      if (DatabaseHelper.instance.isAvailable) {
-        _favorites = await DatabaseHelper.instance.getFavorites();
-      } else {
-        // Fallback ke memory storage
-        _favorites = List.from(_memoryFavorites);
-      }
+      _favorites = await DatabaseHelper.instance.getFavoriteCards();
     } catch (e) {
+      _error = 'Failed to load favorites: $e';
       print('Error loading favorites: $e');
-      _favorites = List.from(_memoryFavorites);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> addToFavorites(YugiohCard card) async {
     try {
-      if (DatabaseHelper.instance.isAvailable) {
-        final result = await DatabaseHelper.instance.addToFavorites(card);
-        if (result != -1) {
-          _favorites.add(card);
-        }
-      } else {
-        // Fallback ke memory storage
-        if (!_memoryFavorites.any((c) => c.id == card.id)) {
-          _memoryFavorites.add(card);
-          _favorites.add(card);
-        }
-      }
+      await DatabaseHelper.instance.insertFavoriteCard(card);
+      _favorites.insert(0, card); // Add to beginning of list
       notifyListeners();
+
+      // Show notification
+      await NotificationService.showFavoriteAddedNotification(card.name);
     } catch (e) {
+      if (e.toString().contains('already in favorites')) {
+        _error = 'Card is already in favorites';
+      } else {
+        _error = 'Failed to add to favorites: $e';
+      }
       print('Error adding to favorites: $e');
+      notifyListeners();
     }
   }
 
   Future<void> removeFromFavorites(YugiohCard card) async {
     try {
-      if (DatabaseHelper.instance.isAvailable) {
-        await DatabaseHelper.instance.removeFromFavorites(card.id);
-      } else {
-        // Fallback ke memory storage
-        _memoryFavorites.removeWhere((c) => c.id == card.id);
-      }
+      await DatabaseHelper.instance.deleteFavoriteCard(card.id);
       _favorites.removeWhere((c) => c.id == card.id);
       notifyListeners();
+
+      // Show notification
+      await NotificationService.showFavoriteRemovedNotification(card.name);
     } catch (e) {
+      _error = 'Failed to remove from favorites: $e';
       print('Error removing from favorites: $e');
+      notifyListeners();
     }
   }
 
   Future<bool> isFavorite(int cardId) async {
     try {
-      if (DatabaseHelper.instance.isAvailable) {
-        return await DatabaseHelper.instance.isFavorite(cardId);
-      } else {
-        return _memoryFavorites.any((card) => card.id == cardId);
-      }
+      return await DatabaseHelper.instance.isFavoriteCard(cardId);
     } catch (e) {
-      return _memoryFavorites.any((card) => card.id == cardId);
+      print('Error checking favorite status: $e');
+      return false;
     }
   }
 
   bool isFavoriteSync(int cardId) {
     return _favorites.any((card) => card.id == cardId);
+  }
+
+  Future<void> toggleFavorite(YugiohCard card) async {
+    final isFav = await isFavorite(card.id);
+    if (isFav) {
+      await removeFromFavorites(card);
+    } else {
+      await addToFavorites(card);
+    }
+  }
+
+  void clearError() {
+    _error = '';
+    notifyListeners();
   }
 }

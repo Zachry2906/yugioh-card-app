@@ -1,19 +1,37 @@
-import 'package:tugasakhirpraktikum/models/yugioh_card.dart';
-
 class Deck {
-  final int? id;
+  int? id;
   final String name;
   final String description;
   final DateTime createdAt;
-  final List<YugiohCard> cards;
+  int cardCount;
 
   Deck({
     this.id,
     required this.name,
     required this.description,
     required this.createdAt,
-    this.cards = const [],
+    this.cardCount = 0,
   });
+
+  // Convert to database format
+  Map<String, dynamic> toDatabase() {
+    return {
+      'name': name,
+      'description': description,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  // Create from database format
+  factory Deck.fromDatabase(Map<String, dynamic> json) {
+    return Deck(
+      id: json['id'],
+      name: json['name'],
+      description: json['description'],
+      createdAt: DateTime.parse(json['created_at']),
+      cardCount: 0, // Will be set separately
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -21,31 +39,7 @@ class Deck {
       'name': name,
       'description': description,
       'created_at': createdAt.toIso8601String(),
+      'card_count': cardCount,
     };
-  }
-
-  factory Deck.fromJson(Map<String, dynamic> json) {
-    return Deck(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      createdAt: DateTime.parse(json['created_at']),
-    );
-  }
-
-  Deck copyWith({
-    int? id,
-    String? name,
-    String? description,
-    DateTime? createdAt,
-    List<YugiohCard>? cards,
-  }) {
-    return Deck(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      createdAt: createdAt ?? this.createdAt,
-      cards: cards ?? this.cards,
-    );
   }
 }

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/deck.dart';
 import '../models/yugioh_card.dart';
 import '../providers/deck_provider.dart';
-import '../widgets/card_grid.dart';
+import '../widgets/card_item.dart';
 
 class DeckDetailScreen extends StatefulWidget {
   final Deck deck;
@@ -15,7 +15,7 @@ class DeckDetailScreen extends StatefulWidget {
 }
 
 class _DeckDetailScreenState extends State<DeckDetailScreen> {
-  List<YugiohCard> _deckCards = [];
+  List<Map<String, dynamic>> _deckCards = [];
   bool _isLoading = true;
 
   @override
@@ -25,11 +25,41 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
   }
 
   Future<void> _loadDeckCards() async {
-    final cards = await context.read<DeckProvider>().getDeckCards(widget.deck.id!);
     setState(() {
-      _deckCards = cards;
-      _isLoading = false;
+      _isLoading = true;
     });
+
+    try {
+      final deckProvider = context.read<DeckProvider>();
+      final cardsWithQuantity = await deckProvider.getDeckCardsWithQuantity(widget.deck.id!);
+
+      setState(() {
+        _deckCards = cardsWithQuantity;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading deck cards: $e')),
+      );
+    }
+  }
+
+  Future<void> _removeCard(YugiohCard card) async {
+    try {
+      await context.read<DeckProvider>().removeCardFromDeck(widget.deck.id!, card.id);
+      await _loadDeckCards(); // Reload to update quantities
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${card.name} removed from deck')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error removing card: $e')),
+      );
+    }
   }
 
   @override
@@ -39,104 +69,180 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
         title: Text(widget.deck.name),
         actions: [
           IconButton(
-            icon: Icon(Icons.info),
-            onPressed: () => _showDeckInfo(context),
+            icon: Icon(Icons.delete),
+            onPressed: () => _showDeleteDeckDialog(),
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _deckCards.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.collections_outlined, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text(
-                        'Empty Deck',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Add cards to this deck from the main cards screen',
-                        style: TextStyle(color: Colors.grey),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+      body: Column(
+        children: [
+          // Deck info header
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(16),
+            color: Colors.purple[50],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.deck.description,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
                   ),
-                )
-              : CardGrid(
-                  cards: _deckCards,
-                  isLoading: false,
-                  onCardTap: (card) => _showCardOptions(context, card),
                 ),
-    );
-  }
-
-  void _showDeckInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(widget.deck.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 4),
-            Text(widget.deck.description.isEmpty ? 'No description' : widget.deck.description),
-            SizedBox(height: 16),
-            Text('Cards: ${_deckCards.length}', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('Created: ${_formatDate(widget.deck.createdAt)}', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+                SizedBox(height: 8),
+                Text(
+                  '${_deckCards.length} cards in deck',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple[800],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-    );
-  }
 
-  void _showCardOptions(BuildContext context, YugiohCard card) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.remove_circle, color: Colors.red),
-              title: Text('Remove from Deck'),
-              onTap: () async {
-                Navigator.pop(context);
-                await context.read<DeckProvider>().removeCardFromDeck(widget.deck.id!, card.id);
-                _loadDeckCards();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${card.name} removed from deck')),
+          // Cards list
+          Expanded(
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : _deckCards.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.collections_outlined,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No cards in this deck',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Add cards from your favorites or search',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : ListView.builder(
+              padding: EdgeInsets.all(8),
+              itemCount: _deckCards.length,
+              itemBuilder: (context, index) {
+                final cardData = _deckCards[index];
+                final card = YugiohCard.fromDatabase(cardData);
+                final quantity = cardData['quantity'] as int;
+
+                return Card(
+                  margin: EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: card.cardImages.isNotEmpty
+                        ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        card.cardImages.first,
+                        width: 40,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 40,
+                            height: 56,
+                            color: Colors.grey[300],
+                            child: Icon(Icons.image_not_supported),
+                          );
+                        },
+                      ),
+                    )
+                        : Container(
+                      width: 40,
+                      height: 56,
+                      color: Colors.grey[300],
+                      child: Icon(Icons.image_not_supported),
+                    ),
+                    title: Text(
+                      card.name,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(card.type),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.purple[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'x$quantity',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple[800],
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        IconButton(
+                          icon: Icon(Icons.remove_circle, color: Colors.red),
+                          onPressed: () => _removeCard(card),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      // Navigate to card detail if needed
+                    },
+                  ),
                 );
               },
             ),
-            ListTile(
-              leading: Icon(Icons.info),
-              title: Text('Card Details'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to card detail screen
-              },
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
+  void _showDeleteDeckDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Deck'),
+          content: Text('Are you sure you want to delete "${widget.deck.name}"? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await context.read<DeckProvider>().deleteDeck(widget.deck.id!);
+                  Navigator.of(context).pop(); // Go back to decks list
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error deleting deck: $e')),
+                  );
+                }
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

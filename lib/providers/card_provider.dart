@@ -2,55 +2,59 @@ import 'package:flutter/material.dart';
 import '../models/yugioh_card.dart';
 import '../services/api_service.dart';
 
-class CardProvider with ChangeNotifier {
+class CardProvider extends ChangeNotifier {
   List<YugiohCard> _cards = [];
   List<YugiohCard> _searchResults = [];
   bool _isLoading = false;
-  String _error = '';
-  int _currentPage = 0;
   bool _hasMore = true;
+  String _error = '';
+  int _currentOffset = 0;
+  static const int _limit = 20;
 
   List<YugiohCard> get cards => _cards;
   List<YugiohCard> get searchResults => _searchResults;
   bool get isLoading => _isLoading;
-  String get error => _error;
   bool get hasMore => _hasMore;
+  String get error => _error;
 
   Future<void> loadCards({bool refresh = false}) async {
     if (_isLoading) return;
 
     if (refresh) {
-      _currentPage = 0;
       _cards.clear();
+      _currentOffset = 0;
       _hasMore = true;
+      _error = '';
     }
 
     _isLoading = true;
-    _error = '';
     notifyListeners();
 
     try {
       final newCards = await ApiService.getAllCards(
-        limit: 20,
-        offset: _currentPage * 20,
+        limit: _limit,
+        offset: _currentOffset,
       );
 
       if (newCards.isEmpty) {
         _hasMore = false;
       } else {
         _cards.addAll(newCards);
-        _currentPage++;
+        _currentOffset += _limit;
       }
+
+      _error = '';
     } catch (e) {
       _error = e.toString();
+      print('Error loading cards: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> searchCards(String query) async {
-    if (query.isEmpty) {
+    if (query.trim().isEmpty) {
       _searchResults.clear();
       notifyListeners();
       return;
@@ -62,13 +66,15 @@ class CardProvider with ChangeNotifier {
 
     try {
       _searchResults = await ApiService.searchCards(query);
+      _error = '';
     } catch (e) {
       _error = e.toString();
       _searchResults.clear();
+      print('Error searching cards: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> loadCardsByType(String type) async {
@@ -77,18 +83,26 @@ class CardProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _searchResults = await ApiService.getCardsByType(type);
+      _cards = await ApiService.getCardsByType(type);
+      _currentOffset = _cards.length;
+      _hasMore = false; // Type filtering doesn't support pagination
+      _error = '';
     } catch (e) {
       _error = e.toString();
-      _searchResults.clear();
+      print('Error loading cards by type: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   void clearSearch() {
     _searchResults.clear();
+    notifyListeners();
+  }
+
+  void clearError() {
+    _error = '';
     notifyListeners();
   }
 }

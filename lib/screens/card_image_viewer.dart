@@ -17,35 +17,35 @@ class _CardImageViewerState extends State<CardImageViewer>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late AnimationController _gyroController;
-  
+
   double _rotationX = 0.0;
   double _rotationY = 0.0;
   double _rotationZ = 0.0;
-  
+
   bool _isGyroEnabled = true;
   bool _isLoading = true;
-  
+
   StreamSubscription? _gyroSubscription;
-  
+
   // Transform values
   double _tiltX = 0.0;
   double _tiltY = 0.0;
   double _scale = 1.0;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _gyroController = AnimationController(
       duration: Duration(milliseconds: 100),
       vsync: this,
     );
-    
+
     _startGyroscope();
     _animationController.forward();
   }
@@ -55,7 +55,7 @@ class _CardImageViewerState extends State<CardImageViewer>
     // Dalam implementasi nyata, gunakan sensors_plus package
     _simulateGyroscope();
   }
-  
+
   void _simulateGyroscope() {
     // Simulasi pergerakan gyroscope untuk demo
     Timer.periodic(Duration(milliseconds: 50), (timer) {
@@ -63,12 +63,12 @@ class _CardImageViewerState extends State<CardImageViewer>
         timer.cancel();
         return;
       }
-      
+
       // Simulasi data gyroscope (dalam implementasi nyata, gunakan sensor data)
       final time = DateTime.now().millisecondsSinceEpoch / 1000.0;
       final simulatedX = math.sin(time * 0.5) * 0.3;
       final simulatedY = math.cos(time * 0.3) * 0.2;
-      
+
       setState(() {
         _tiltX = simulatedX;
         _tiltY = simulatedY;
@@ -109,13 +109,13 @@ class _CardImageViewerState extends State<CardImageViewer>
                   _tiltY = 0.0;
                 }
               });
-              
+
               HapticFeedback.lightImpact();
-              
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    _isGyroEnabled ? 'Gyro Effect Enabled' : 'Gyro Effect Disabled'
+                      _isGyroEnabled ? 'Gyro Effect Enabled' : 'Gyro Effect Disabled'
                   ),
                   duration: Duration(seconds: 1),
                 ),
@@ -190,7 +190,7 @@ class _CardImageViewerState extends State<CardImageViewer>
                               ),
                             ),
                           ),
-                          
+
                           // Card image
                           if (widget.card.cardImages.isNotEmpty)
                             Image.network(
@@ -210,7 +210,7 @@ class _CardImageViewerState extends State<CardImageViewer>
                                       CircularProgressIndicator(
                                         value: loadingProgress.expectedTotalBytes != null
                                             ? loadingProgress.cumulativeBytesLoaded /
-                                                loadingProgress.expectedTotalBytes!
+                                            loadingProgress.expectedTotalBytes!
                                             : null,
                                         color: Colors.purple,
                                       ),
@@ -244,7 +244,7 @@ class _CardImageViewerState extends State<CardImageViewer>
                                 );
                               },
                             ),
-                          
+
                           // Holographic effect overlay
                           if (_isGyroEnabled)
                             Positioned.fill(

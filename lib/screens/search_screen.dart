@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/card_provider.dart';
-import '../services/preferences_service.dart';
 import '../widgets/card_grid.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -11,27 +10,28 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<String> _searchHistory = [];
+  bool _isSearching = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadSearchHistory();
-  }
-
-  Future<void> _loadSearchHistory() async {
-    final history = await PreferencesService.getSearchHistory();
-    setState(() {
-      _searchHistory = history;
-    });
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) return;
 
-    await PreferencesService.addToSearchHistory(query.trim());
-    context.read<CardProvider>().searchCards(query.trim());
-    _loadSearchHistory();
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      await context.read<CardProvider>().searchCards(query);
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
   }
 
   @override
@@ -42,117 +42,113 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       body: Column(
         children: [
-          Padding(
+          // Search bar
+          Container(
             padding: EdgeInsets.all(16),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search for cards...',
                 prefixIcon: Icon(Icons.search),
-                suffixIcon: IconButton(
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
                   icon: Icon(Icons.clear),
                   onPressed: () {
                     _searchController.clear();
                     context.read<CardProvider>().clearSearch();
                   },
-                ),
+                )
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
               onSubmitted: _performSearch,
+              onChanged: (value) {
+                setState(() {}); // Rebuild to show/hide clear button
+              },
             ),
           ),
-          Consumer<CardProvider>(
-            builder: (context, cardProvider, child) {
-              if (cardProvider.searchResults.isEmpty && !cardProvider.isLoading) {
-                return Expanded(
-                  child: Column(
-                    children: [
-                      if (_searchHistory.isNotEmpty) ...[
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Recent Searches',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  await PreferencesService.clearSearchHistory();
-                                  _loadSearchHistory();
-                                },
-                                child: Text('Clear'),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _searchHistory.length,
-                            itemBuilder: (context, index) {
-                              final query = _searchHistory[index];
-                              return ListTile(
-                                leading: Icon(Icons.history),
-                                title: Text(query),
-                                onTap: () {
-                                  _searchController.text = query;
-                                  _performSearch(query);
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      ] else
-                        Expanded(
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.search, size: 64, color: Colors.grey),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Search for Yu-Gi-Oh! cards',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Enter a card name to get started',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }
 
-              if (cardProvider.isLoading) {
-                return Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
+          // Search results
+          Expanded(
+            child: Consumer<CardProvider>(
+              builder: (context, cardProvider, child) {
+                if (_isSearching) {
+                  return Center(child: CircularProgressIndicator());
+                }
 
-              return Expanded(
-                child: CardGrid(
+                if (cardProvider.searchResults.isEmpty && _searchController.text.isNotEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'No cards found',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Try searching with different keywords',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                if (cardProvider.searchResults.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Search for Yu-Gi-Oh! Cards',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Enter a card name to start searching',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return CardGrid(
                   cards: cardProvider.searchResults,
                   isLoading: false,
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

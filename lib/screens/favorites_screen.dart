@@ -3,7 +3,21 @@ import 'package:provider/provider.dart';
 import '../providers/favorites_provider.dart';
 import '../widgets/card_grid.dart';
 
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
+  @override
+  _FavoritesScreenState createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load favorites when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<FavoritesProvider>().loadFavorites();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,30 +30,70 @@ class FavoritesScreen extends StatelessWidget {
             return Center(child: CircularProgressIndicator());
           }
 
-          if (favoritesProvider.favorites.isEmpty) {
+          if (favoritesProvider.error.isNotEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+                  Icon(Icons.error, size: 64, color: Colors.red),
                   SizedBox(height: 16),
                   Text(
-                    'No favorite cards yet',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    'Error loading favorites',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   SizedBox(height: 8),
-                  Text(
-                    'Add cards to favorites to see them here',
-                    style: TextStyle(color: Colors.grey),
+                  Text(favoritesProvider.error),
+                  SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      favoritesProvider.clearError();
+                      favoritesProvider.loadFavorites();
+                    },
+                    child: Text('Retry'),
                   ),
                 ],
               ),
             );
           }
 
-          return CardGrid(
-            cards: favoritesProvider.favorites,
-            isLoading: false,
+          if (favoritesProvider.favorites.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.favorite_border,
+                    size: 80,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No Favorite Cards',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Add cards to favorites to see them here',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => favoritesProvider.loadFavorites(),
+            child: CardGrid(
+              cards: favoritesProvider.favorites,
+              isLoading: false,
+            ),
           );
         },
       ),
