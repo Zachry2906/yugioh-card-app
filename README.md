@@ -24,9 +24,13 @@ A comprehensive Flutter application for Yu-Gi-Oh! Trading Card Game enthusiasts 
 ### Additional Features
 - **Local Notifications**: Get updates about new cards and features
 - **Offline Access**: View your saved cards and decks even without internet connection
-- **Location Services**: Find nearby card shops or tournaments (using Geolocator)
-- **Image Upload**: Upload images of physical cards to your collection
+- **Location Services**: untuk menentukan mata uang default, Harga kartu otomatis ditampilkan dalam mata uang lokal, Menentukan zona waktu berdasarkan lokasi
+- **Image Upload**: Upload images for your profile
 - **Settings**: Customize app appearance and behavior
+- ""Time Convertion**:
+  -- Market Hours: Menampilkan jam buka/tutup "trading card market" di berbagai zona waktu
+  --Real-time Clock**: Update setiap detik untuk semua timezone
+  --Market Status**: Indikator apakah market sedang buka/tutup
 
 ## Technical Details
 
